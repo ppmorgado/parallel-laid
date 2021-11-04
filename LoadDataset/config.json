@@ -1,0 +1,63 @@
+[
+    [
+       [
+          "/users/hpc/pmorgado/laidp/data/raw/",
+          "laidp_original_dataset_1000k.h5",
+          2000,
+          1000000,
+          1,
+          2,
+          "CONTIGUOUS",
+          0,
+          0,
+          "T6_1000k",
+          "laidp_dmatrix_",
+          5000,
+          0,
+          "laidp_aux.h5",
+          "Y",
+          "Y",
+          "Y"
+       ]
+    ],
+    [
+        [ "D1C0", "D1C0.txt", 0,     0,      0, 1699,  199999, 0 ],
+        [ "D1C1", "D1C1.txt", 1,  1700,      0, 1999,  199999, 0 ],
+        [ "D2C0", "D2C0.txt", 0,     0, 200000, 1699,  399999, 0 ],
+        [ "D2C1", "D2C1.txt", 1,  1700, 200000, 1999,  399999, 0 ],
+        [ "D3C0", "D3C0.txt", 0,     0, 400000, 1699,  599999, 0 ],
+        [ "D3C1", "D3C1.txt", 1,  1700, 400000, 1999,  599999, 0 ],
+        [ "D4C0", "D4C0.txt", 0,     0, 600000, 1699,  799999, 0 ],
+        [ "D4C1", "D4C1.txt", 1,  1700, 600000, 1999,  799999, 0 ],
+        [ "D5C0", "D5C0.txt", 0,     0, 800000, 1699,  999999, 1 ],
+        [ "D5C1", "D5C1.txt", 1,  1700, 800000, 1999,  999999, 1 ]              
+    ],
+    [
+        [
+            "0 path for raw data files", 
+            "1 dataset file",
+            "2 number rows", 
+            "3 number features", 
+            "4 number class", 
+            "5 number dif values on class", 
+            "6 Chunk type ('CONTIGUOUS', 'CHUNKED')",
+            "7 chunk row or zero (0)",
+            "8 chunk col or zero (0)", 
+            "9 Experiment ref", 
+            "10 DisjointMatrix dset file", 
+            "11 Step for sort",
+            "12 features_used_in_dm for test only zero (0) for all", 
+            "13 Redundant dset File", 
+            "14 check and fix redundant and/or inconsistent observations Y/N",
+            "15 create dm dset Y/N",
+            "16 perform_find_solution Y/N"
+        ],
+        [
+            "Block, File, class, row start, col start, row end, col end, right most col"
+        ],
+        [
+            "C:\\laidp\\data\\raw\\",
+            "/users/hpc/pmorgado/laidp/data/raw/"
+        ]
+    ]
+ ]

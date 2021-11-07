@@ -5,8 +5,8 @@ Laid Serial 2021 version - ready for parallel
 
 Usage:  save this script and run
 
-    $python laid_serial_6b.py
-    mpirun python laid_serial_6b.py
+    $python laid_serial.py
+    mpirun python laid_serial.py
 
 2021 Paulo Morgado
 Based or adapted from previous work:
@@ -48,7 +48,7 @@ def main():
     task_id = MPI.COMM_WORLD.rank                # The process ID (integer 0-3 for 4-process run)
     worker_nodes = MPI.COMM_WORLD.Get_size()     # Number SLURM_NTASKS  valid are 1, 2 or 5 for 10 WorkPackges
     name = MPI.Get_processor_name()
-    code_base = "laid_serial_6b.py"   
+    code_base = "laid_serial_6.py"   
     msg = "ProcessId {0} of {1} on {2} running{3}\n"
     sys.stdout.write(msg.format(task_id, worker_nodes, name, code_base))
 
@@ -83,38 +83,38 @@ def main():
 
     # read Dataset fragment
     dset = []
-    # for i in range(worker_nodes):
-    dset.append(  hf['db_' + str(task_id)] ) # hf['database']    
+    for i in range(worker_nodes):
+        dset.append(  hf['db_' + str(i)] ) # hf['database']    
 
     # dset[task_id] = hf['db_' + str(task_id)]  # hf['database']    
 
-    sys.stdout.write("Task_{}; fragmet {} shape {} content sample\n{}\n".format(task_id, 'db_' + str(task_id), dset[0].shape, dset[0][0:10,0:10]))
+    sys.stdout.write("Task_{}; fragmet {} shape {} content sample {}\n".format(task_id, 'db_' + str(i), dset[task_id].shape, dset[task_id][0:1,10:1]))
 
     dset_class = hf['class']
 
-    nrows_data = dset[0].attrs['nrows_data']    
+    nrows_data = dset[task_id].attrs['nrows_data']    
     number_of_rows = nrows_data
-    ncols_data = dset[0].attrs['ncols_data']           # cols of data       
-    number_of_features = ncols_data                    # or config_base[0][3]  
-    ncols_total =dset[0].attrs['ncols_total']          # include cols of data + jnsq cols + label col
+    ncols_data = dset[task_id].attrs['ncols_data']           # cols of data       
+    number_of_features = ncols_data                 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! or config_base[0][3]  
+    ncols_total =dset[task_id].attrs['ncols_total']          # include cols of data + jnsq cols + label col
     number_of_columns = ncols_total
 
-    # data_starts = dset.attrs['data_starts']       # no need 
-    # data_ends = dset.attrs['data_ends']           # no need
+    # data_starts = dset.attrs['data_starts']       # not needed 
+    # data_ends = dset.attrs['data_ends']           # not needed
 
     # number_of_jnsq_needed = dset.attrs['number_jnsq_needed']    # efective
     try:
-        number_of_jnsq_needed = dset[0].attrs['number_jnsq_needed']    # efective
+        number_of_jnsq_needed = dset[task_id].attrs['number_jnsq_needed']    # efective
     except KeyError:
         number_of_jnsq_needed = 0
-    number_jnsq_features = dset[0].attrs['number_jnsq_features']   # reserved cols if not needed col values remains with zero    
+    number_jnsq_features = dset[task_id].attrs['number_jnsq_features']   # reserved cols if not needed col values remains with zero    
     if number_jnsq_features == 0:
         number_jnsq_features = 1                    # ETL always reserve one column
     # jnsq_starts = dset.attrs['jnsq_starts']       # not needed - ncols_data + number_jnsq_features -1    # due to base 0 on h5py
     # jnsq_ends = dset.attrs['jnsq_ends']           # not needed - ncols_data + number_jnsq_features -1    # due to base 0 on h5py    
     
-    number_dif_class_values = dset[0].attrs['number_dif_class_values'] 
-    number_class_cols = dset[0].attrs['number_class_cols'] 
+    number_dif_class_values = dset[task_id].attrs['number_dif_class_values'] 
+    number_class_cols = dset[task_id].attrs['number_class_cols'] 
     number_of_classes = number_class_cols
     # class_start = dset.attrs['class_starts']      # not needed - ncols_data + number_jnsq_features + number_class_cols -1
     # class_ends = dset.attrs['class_ends']         # not needed - ncols_data + number_jnsq_features + number_class_cols -1
@@ -161,12 +161,12 @@ def main():
         # ordered_array     [0 0 0 1 2 3 3 3]
         # positional_array  [6 2 3 1 4 0 5 7]
 
-        ordered_array = np.zeros((number_of_rows), dtype=int)                                   # stores order of order of observations, observations with equal attributes have the same order 
-        positional_array = np.arange((number_of_rows), dtype=int)                               # stores positions of rows
+        ordered_array = np.zeros((number_of_rows), dtype=int)                       # stores order of order of observations, observations with equal attributes have the same order
+        positional_array = np.arange((number_of_rows), dtype=int)                   # stores positions of rows
 
-        col_step_on_sorting = config_base[0][11]                                                # number of columns in each column block to handle
-        number_blocks_to_sort = int(number_of_columns/col_step_on_sorting)+1                    # number of column blocks to handle
-        col_start = 0 																			# col start on next block 
+        col_step_on_sorting = config_base[0][11]                                    # number of columns in each column block to handle
+        number_blocks_to_sort = int(number_of_columns/col_step_on_sorting)+1        # number of column blocks to handle
+        col_start = 0                                                               # col start on next block 
 
 
 
@@ -175,13 +175,13 @@ def main():
 
         for i in range(number_blocks_to_sort): 
             
-            if col_start + col_step_on_sorting > number_of_columns:                             # Ensure that size of block fit number of columns 
+            if col_start + col_step_on_sorting > number_of_columns:                         # Ensure that size of block fit number of columns 
                 col_step_on_sorting = number_of_columns - col_start 
 
-            block_read = dset[0][:,col_start:col_start + col_step_on_sorting]                   # Read data block 
-            block_read = block_read[positional_array]                                           # sort rows by order defined on previous block 
+            block_read = dset[task_id][:,col_start:col_start + col_step_on_sorting]         # Read data block   xleitura
+            block_read = block_read[positional_array]                                       # sort rows by order defined on previous block 
 
-            aux_matrix = np.zeros((number_of_rows,col_step_on_sorting+2), dtype=int)            # join arrays ordered_array, positional_array in one 2D array (matrix)  
+            aux_matrix = np.zeros((number_of_rows,col_step_on_sorting+2), dtype=int)        # join arrays ordered_array, positional_array in one 2D array (matrix)  
             aux_matrix[:,0] = ordered_array[:] 
             aux_matrix[:,1:col_step_on_sorting+1] = block_read[:,:] 
             aux_matrix[:,col_step_on_sorting+1] = positional_array[:] 
@@ -189,20 +189,23 @@ def main():
             # determines the order indices of the observations (starts by inverting the order of the columns, transposes and determines the order index of the columns)
 
             auxi = np.lexsort(np.fliplr(aux_matrix).T) 
-            aux_matrix = aux_matrix[auxi]                                                       # sorts rows of the matrix according to the order indices
-            ordered_array[0] = 0                                                                # first row always is order zero 
+            aux_matrix = aux_matrix[auxi]                                                   # sorts rows of the matrix according to the order indices
+            ordered_array[0] = 0                                                            # first row always is order zero 
 
-            for j in range(1,number_of_rows):                                                   # check each row of the matrix is the same as the previous one
-                if col_start < number_of_columns - number_jnsq_features - number_of_classes:    # feature column ? 
+            for j in range(1,number_of_rows):                                               # check each row of the matrix is the same as the previous one
+                if col_start < number_of_columns - number_jnsq_features - number_of_classes: # feature column ? 
                     if np.array_equal(aux_matrix[j,0:col_step_on_sorting+1], aux_matrix[j-1,0:col_step_on_sorting+1]): 
-                        ordered_array[j]=ordered_array[j-1]                                     # if line is the same as the previous one, it has the same order value
-                    elif col_start+col_step_on_sorting == number_of_columns and np.array_equal(aux_matrix[j,0: col_step_on_sorting - number_of_classes - number_jnsq_features + 1 ], aux_matrix[j-1,0: col_step_on_sorting - number_of_classes - number_jnsq_features + 1 ]): 
-                        ordered_array[j]=ordered_array[j-1]                                     # similar to the previous one, in case it is the last block
-                    else: 
-                        ordered_array[j]=ordered_array[j-1]+1                                   # in case they are not the same, the order of the line will have the next value to the previous one.
 
-            positional_array = aux_matrix[:,col_step_on_sorting+1]                              # after matrix sort, the position of each row/observation in the dataset is saved.
-            col_start += col_step_on_sorting                                                    # col start on next block 
+                        ordered_array[j]=ordered_array[j-1]                                 # if line is the same as the previous one, it has the same order value
+                    elif col_start+col_step_on_sorting == number_of_columns and np.array_equal(aux_matrix[j,0: col_step_on_sorting - number_of_classes - number_jnsq_features + 1 ], aux_matrix[j-1,0: col_step_on_sorting - number_of_classes - number_jnsq_features + 1 ]): 
+
+                        ordered_array[j]=ordered_array[j-1]                                 # similar to the previous one, in case it is the last block
+                    else: 
+
+                        ordered_array[j]=ordered_array[j-1]+1                               # in case they are not the same, the order of the line will have the next value to the previous one.
+
+            positional_array = aux_matrix[:,col_step_on_sorting+1]                          # after matrix sort, the position of each row/observation in the dataset is saved.
+            col_start += col_step_on_sorting                                                # col start on next block 
 
 
         t2 = time.perf_counter()
@@ -223,21 +226,19 @@ def main():
         sys.stdout.write("Task_{}; Check redundant and/or inconsistent observations \n".format(task_id)) 
         t1 = time.perf_counter()
 
+        number_redundant_rows = 0                                                                    # number of redundant rows  
+        redundant_array = np.zeros((number_of_rows, 1), dtype=int)                                   # stores position of redundant rows  
 
-        number_redundant_rows = 0                                                                   # number of redundant rows  
-        redundant_array = np.zeros((number_of_rows, 1), dtype=int)                                  # stores position of redundant rows  
+        number_inconsistent_rows = 0                                                                 # number of inconsistent rows
+        number_of_inconsistency = -1                                                                 # number of different inconsistencies - 1
+        inconsistent_array = np.zeros((number_of_rows,2), dtype=int)                                 # stores position of inconsistent rows and their index 
 
-
-        number_inconsistent_rows = 0                                                                # number of inconsistent rows
-        number_of_inconsistency = -1                                                                # number of different inconsistencies - 1
-        inconsistent_array = np.zeros((number_of_rows,2), dtype=int)                                # stores position of inconsistent rows and their index 
-
-        read_col_array = aux_matrix[:,col_step_on_sorting]                                          # TODO: use dset_class[...,0:number_of_classes] 
+        read_col_array = aux_matrix[:,col_step_on_sorting]                                           # TODO: use dset_class[...,0:number_of_classes]
 
         # test first and second row
 
-        if ordered_array[0] == ordered_array[1]:                                                    # check if the first observations of the ordered matrix is equal to the next one, ie if the attributes are equal
-            if (read_col_array[0] != read_col_array[1]):                                            # if the value of the class is different the first row of the matrix is an inconsistency
+        if ordered_array[0] == ordered_array[1]:                                                     # check if the first observations of the ordered matrix is equal to the next one, ie if the attributes are equal
+            if (read_col_array[0] != read_col_array[1]): # if the value of the class is different the first row of the matrix is an inconsistency
                 number_of_inconsistency += 1                                                                    # found the first inconsistence 
                 inconsistent_array[number_of_inconsistency,:] = [positional_array[0],number_of_inconsistency]   # stores them (position and count) 
                 number_inconsistent_rows += 1 
@@ -319,11 +320,11 @@ def main():
             test = 'No need for jnsq attributes' 
         elif number_of_jnsq_needed == 1: 
             if fix_redundant_inconsistent_rows == 'Y':
-                dset[0][:,number_of_features:number_of_features+number_jnsq_features] = jnsq_array[...] 
+                dset[task_id][:,number_of_features:number_of_features+number_jnsq_features] = jnsq_array[...] 
             test = 'The jnsq attribute is populated on original Dataset'         
         else: 
             if fix_redundant_inconsistent_rows == 'Y':
-                dset[0][:,number_of_features:number_of_features+number_jnsq_features] = jnsq_array[...] 
+                dset[task_id][:,number_of_features:number_of_features+number_jnsq_features] = jnsq_array[...] 
             test ='({0}) jnsq attributes are filled on original Dataset'.format(number_of_jnsq_needed)
 
         sys.stdout.write("Task_{}; jnsq attributes; ({}) - {}\n".format(task_id, number_of_jnsq_needed, test))
@@ -337,30 +338,30 @@ def main():
         # 1.5 stores ordered and positional arrays on aux dataset - overwrited on parallel runs
         # ---------------------------------------------------        
 
-        # hdf5_aux_file = os.path.join(mydir, config_base[0][13])
-        # hf_aux = h5py.File(hdf5_aux_file, 'w', driver='mpio', comm=MPI.COMM_WORLD)  # w = Create file, truncate if exists / a	Read/write if exists, create otherwise
+        hdf5_aux_file = os.path.join(mydir, config_base[0][13])
+        hf_aux = h5py.File(hdf5_aux_file, 'w', driver='mpio', comm=MPI.COMM_WORLD)  # w = Create file, truncate if exists / a	Read/write if exists, create otherwise
 
-        # ds_order = []
-        # ds_order.append(hf_aux.create_dataset('order_{0}'.format(task_id), data=ordered_array) )
-        # # dset_order = hf_aux.create_dataset('order', data=ordered_array)
+        ds_order = []
+        ds_order.append(hf_aux.create_dataset('order_{0}'.format(task_id), data=ordered_array) )
+        # dset_order = hf_aux.create_dataset('order', data=ordered_array)
 
-        # ds_position = []
-        # ds_position.append(hf_aux.create_dataset('position_{0}'.format(task_id), data=positional_array)   )
-        # # dset_position = hf_aux.create_dataset('position', data=positional_array)    
+        ds_position = []
+        ds_position.append(hf_aux.create_dataset('position_{0}'.format(task_id), data=positional_array)   )
+        # dset_position = hf_aux.create_dataset('position', data=positional_array)    
 
-        # ds_redundant = []
-        # ds_redundant.append(hf_aux.create_dataset('redundant_{0}'.format(task_id), data=redundant_array, dtype= np.dtype(np.int8)) )
-        # # dset_redundant = hf_aux.create_dataset('redundant', data=redundant_array, dtype= np.dtype(np.int8))
+        ds_redundant = []
+        ds_redundant.append(hf_aux.create_dataset('redundant_{0}'.format(task_id), data=redundant_array, dtype= np.dtype(np.int8)) )
+        # dset_redundant = hf_aux.create_dataset('redundant', data=redundant_array, dtype= np.dtype(np.int8))
         
-        # ds_inconsistent = []
-        # ds_inconsistent.append( hf_aux.create_dataset('inconsistent_{0}'.format(task_id), data=inconsistent_array, dtype= np.dtype(np.int8))  )
-        # # dset_inconsistent = hf_aux.create_dataset('inconsistent', data=inconsistent_array, dtype= np.dtype(np.int8))          
+        ds_inconsistent = []
+        ds_inconsistent.append( hf_aux.create_dataset('inconsistent_{0}'.format(task_id), data=inconsistent_array, dtype= np.dtype(np.int8))  )
+        # dset_inconsistent = hf_aux.create_dataset('inconsistent', data=inconsistent_array, dtype= np.dtype(np.int8))          
         
-        # ds_jnsq = []
-        # ds_jnsq.append( hf_aux.create_dataset('jnsq_{0}'.format(task_id), data=jnsq_array) )
-        # # dset_jnsq = hf_aux.create_dataset('jnsq', data=jnsq_array)           
+        ds_jnsq = []
+        ds_jnsq.append( hf_aux.create_dataset('jnsq_{0}'.format(task_id), data=jnsq_array) )
+        # dset_jnsq = hf_aux.create_dataset('jnsq', data=jnsq_array)           
 
-        # # ERROR dset[task_id].attrs['number_jnsq_needed'] = number_of_jnsq_needed     
+        # ERRO dset[task_id].attrs['number_jnsq_needed'] = number_of_jnsq_needed     # Atualizar o metadado xnje - número de atributos jnsq efetivos 
     
 
 
@@ -368,70 +369,69 @@ def main():
         # 1.6 Pre-check Disjoint Matrix - for Paralell version
         # ---------------------------------------------------
 
-        # condition ?
-        # if 1 == 1:   #if worker_nodes == 1:  # running serial
-        sys.stdout.write("Task_{}; Pre-check Disjoint Matrix - for DM Paralell version\n".format(task_id)) 
-        disjoint_array = np.zeros((number_of_features + number_jnsq_features), dtype=np.dtype(np.int8))    # stores compare of mi e mj sums
-        sys.stdout.write("Task_{}; shape disjoint_array : {}\n".format(task_id, disjoint_array.shape )) 
+        if 1 == 1:   #if worker_nodes == 1:  # running serial
+            sys.stdout.write("Task_{}; Pre-check Disjoint Matrix - for DM Paralell version\n".format(task_id)) 
+            disjoint_array = np.zeros((number_of_features + number_jnsq_features), dtype=np.dtype(np.int8))    # stores compare of mi e mj sums
+            sys.stdout.write("Task_{}; shape disjoint_array : {}\n".format(task_id, disjoint_array.shape )) 
 
-        t1 = time.perf_counter()
+            t1 = time.perf_counter()
 
-        rows_on_disjoint_matrix = 0 
-        number_of_interact_needed_worst_case =  int( ( number_of_rows -1 ) * number_of_rows /2 )    # number of interact needed - worst case
+            rows_on_disjoint_matrix = 0 
+            number_of_interact_needed_worst_case =  int( ( number_of_rows -1 ) * number_of_rows /2 )    # number of interact needed - worst case
 
-        number_of_interact = 0   
+            number_of_interact = 0   
 
-        dm_guide_array = np.zeros((number_of_rows, 2),  dtype= np.dtype(np.int32))                  #   stores guide to parallel handle row index  numpy.int32: 32-bit signed integer (-2_147_483_648 to 2_147_483_647)
+            dm_guide_array = np.zeros((number_of_rows, 2),  dtype= np.dtype(np.int32)) #   stores guide to parallel handle row index  numpy.int32: 32-bit signed integer (-2_147_483_648 to 2_147_483_647)
 
-        for i in range(number_of_rows-1):
+            for i in range(number_of_rows-1):
 
-            number_of_interact_per_row = 0 
-            rows_on_disjoint_matrix_per_row = 0
-            dm_guide_array[i,0] = rows_on_disjoint_matrix
+                number_of_interact_per_row = 0 
+                rows_on_disjoint_matrix_per_row = 0
+                dm_guide_array[i,0] = rows_on_disjoint_matrix
 
-            t1_row = time.perf_counter()
+                t1_row = time.perf_counter()
 
-            if (i not in redundant_array):                                                          # redundant observations are not considered.
+                if (i not in redundant_array):                                                  # redundant observations are not considered.
 
-                read_mi_array = dset[0][i,:number_of_features+number_jnsq_features]                 # read attributes and jnsq columns of the observation to be compared
+                    read_mi_array = dset[task_id][i,:number_of_features+number_jnsq_features]   # read attributes and jnsq columns of the observation to be compared
 
-                for j in range(i+1, number_of_rows):                                                # compares the current observation (row) with the observations in the following rows
+                    for j in range(i+1, number_of_rows):                                        # compares the current observation (row) with the observations in the following rows
 
-                    number_of_interact_per_row += 1
-                    if (j not in redundant_array) and (class_array[i] != class_array[j]):           # if the observation to be compared is not redundant and has a different class value
+                        number_of_interact_per_row += 1
+                        if (j not in redundant_array) and (class_array[i] != class_array[j]):   # if the observation to be compared is not redundant and has a different class value
 
-                        read_mj_array = dset[0][j,:number_of_features + number_jnsq_features]       # read attributes and jnsq columns from the observation to which it compares
-                        disjoint_array = np.absolute(np.subtract( read_mi_array , read_mj_array ))  # checks whether the elements of the current observation and the observation to it is being compared are equal (=0) or different (=1)
+                            read_mj_array = dset[task_id][j,:number_of_features + number_jnsq_features] # read attributes and jnsq columns from the observation to which it compares
+                            disjoint_array = np.absolute(np.subtract( read_mi_array , read_mj_array ))  # checks whether the elements of the current observation and the observation to it is being compared are equal (=0) or different (=1)
 
-                        rows_on_disjoint_matrix += 1  
-                        rows_on_disjoint_matrix_per_row += 1
+                            rows_on_disjoint_matrix += 1  
+                            rows_on_disjoint_matrix_per_row += 1
 
-                    number_of_interact += 1    
-
-
-            dm_guide_array[i,1] = rows_on_disjoint_matrix_per_row
+                        number_of_interact += 1    
 
 
-            t2_row = time.perf_counter()
-            test = (f"in; {t2_row - t1_row:0.4f}; seconds")
-            if i % 100 == 0:
-                sys.stdout.write("Task_{}; Pre-check for Row ; {}; Class; {}; Number of interact; {}; Disjoint rows found; {}; {}\n".format(task_id, i,  class_array[i], number_of_interact_per_row, rows_on_disjoint_matrix_per_row, test )) 
-
-        # ERROR= dset[task_id].attrs['rows_on_disjoint_matrix'] = rows_on_disjoint_matrix  # update metadata of original dataset
-        store_rows_on_disjoint_matrix = rows_on_disjoint_matrix
-
-        # dset_dm_guide = []
-        # dset_dm_guide.append( hf_aux.create_dataset('dm_guide_{0}'.format(task_id), data=dm_guide_array, dtype=np.dtype(np.int32))  )
+                dm_guide_array[i,1] = rows_on_disjoint_matrix_per_row
 
 
-        t2 = time.perf_counter()
-        print(f"Task_{task_id}; Pre-check Disjoint Matrix done in; {t2 - t1:0.4f}; seconds")
-        sys.stdout.write("Task_{}; max interact (worst case);{} effective interact;{} \n".format(task_id, number_of_interact_needed_worst_case  ,number_of_interact ))       
-        sys.stdout.write("Task_{}; Total number_of_interact      : {}\n".format(task_id, number_of_interact ))   
-        sys.stdout.write("Task_{}; Total rows_on_disjoint_matrix : {}\n".format(task_id, rows_on_disjoint_matrix ))    
-        sys.stdout.write("Task_{}; Estimated fie size {} GB without compression \n".format(task_id, (rows_on_disjoint_matrix * (number_of_features + number_jnsq_features)) / 1024 / 1024 / 1024 ))
-        # else:
-        #     sys.stdout.write("Task_{}; Pre-check Disjoint Matrix - NOT performed\n".format(task_id)) 
+                t2_row = time.perf_counter()
+                test = (f"in; {t2_row - t1_row:0.4f}; seconds")
+                if i % 100 == 0:
+                    sys.stdout.write("Task_{}; Pre-check for Row ; {}; Class; {}; Number of interact; {}; Disjoint rows found; {}; {}\n".format(task_id, i,  class_array[i], number_of_interact_per_row, rows_on_disjoint_matrix_per_row, test )) 
+
+            # ERRO= dset[task_id].attrs['rows_on_disjoint_matrix'] = rows_on_disjoint_matrix  # update metadata of original dataset
+            store_rows_on_disjoint_matrix = rows_on_disjoint_matrix
+
+            dset_dm_guide = []
+            dset_dm_guide.append( hf_aux.create_dataset('dm_guide_{0}'.format(task_id), data=dm_guide_array, dtype=np.dtype(np.int32))  )
+
+
+            t2 = time.perf_counter()
+            print(f"Task_{task_id}; Pre-check Disjoint Matrix done in; {t2 - t1:0.4f}; seconds")
+            sys.stdout.write("Task_{}; max interact (worst case);{} effective interact;{} \n".format(task_id, number_of_interact_needed_worst_case  ,number_of_interact ))       
+            sys.stdout.write("Task_{}; Total number_of_interact      : {}\n".format(task_id, number_of_interact ))   
+            sys.stdout.write("Task_{}; Total rows_on_disjoint_matrix : {}\n".format(task_id, rows_on_disjoint_matrix ))    
+            sys.stdout.write("Task_{}; Estimated fie size {} GB without compression \n".format(task_id, (rows_on_disjoint_matrix * (number_of_features + number_jnsq_features)) / 1024 / 1024 / 1024 ))
+        else:
+            sys.stdout.write("Task_{}; Pre-check Disjoint Matrix - NOT performed\n".format(task_id)) 
     else:
         sys.stdout.write("Task_{}; Check and Fix redundant and/or inconsistent observations Y/N: {}\n".format(task_id, check_redundant_inconsistent_rows)) 
 
@@ -450,25 +450,27 @@ def main():
         # return
 
 
+
+
         sys.stdout.write("Task_{}; Build Disjoint Matrix =Y\n".format(task_id)) 
-        disjoint_array = np.zeros((number_of_features + number_jnsq_features), dtype=np.dtype(np.int8))     # stores compare of mi e mj sums
+        disjoint_array = np.zeros((number_of_features + number_jnsq_features), dtype=np.dtype(np.int8))    # stores compare of mi e mj sums
         sys.stdout.write("Task_{}; shape disjoint_array : {}\n".format(task_id, disjoint_array.shape )) 
 
         t1 = time.perf_counter()
 
         rows_on_disjoint_matrix = 0 
-        number_of_interact_needed_worst_case =  int( ( number_of_rows -1 ) * number_of_rows /2 )            # number of interact needed - worst case
+        number_of_interact_needed_worst_case =  int( ( number_of_rows -1 ) * number_of_rows /2 )    # number of interact needed - worst case
         # create_disjoint_matrix_file = config_base[0][15]
 
         # if create_disjoint_matrix_file == 'Y':
 
-        rows_on_disjoint_matrix = store_rows_on_disjoint_matrix                                             # dset[task_id].attrs['rows_on_disjoint_matrix'] # from previuos recon
+        rows_on_disjoint_matrix = store_rows_on_disjoint_matrix #  dset[task_id].attrs['rows_on_disjoint_matrix'] # from previuos recon
         if rows_on_disjoint_matrix == 0:
             if number_dif_class_values == 2:
                 unique, counts = np.unique(class_array, return_counts=True)
                 class_entry_array = np.asarray((unique, counts)).T
                 sys.stdout.write("Task_{}; sum group for class;{}  \n".format(task_id, class_entry_array ))   
-                size_a = np.prod(class_entry_array[:,1] )                                                   # this is a genearization of  size_a = rows_class_0 * rows_class_1  
+                size_a = np.prod(class_entry_array[:,1] ) # this is a genearization of  size_a = rows_class_0 * rows_class_1  
                 sys.stdout.write("Task_{}; max of disjoint rows (worst case);{} estimated disjoint rows 2 classe values;{} \n".format(task_id, number_of_interact_needed_worst_case  ,size_a ))   
             else:
                 size_a = number_of_interact_needed_worst_case
@@ -498,30 +500,18 @@ def main():
         # else:      
             
                     
-        #dm_parallel_file_name =  hdf5_disjoint_file #+ '.h5'
-        dm_parallel_file_name = 'dm_' + str(task_id) + '.h5'
+        dm_parallel_file_name = hdf5_disjoint_file #+ '.h5'
+        # dm_parallel_file_name = hdf5_disjoint_file + str(task_id) + '.h5'
 
         # if worker_nodes > 1:  # serial version running in parallel - handle all rows, and a subset of columns - split dm files 
 
         hfdm = h5py.File(dm_parallel_file_name, 'w', driver='mpio', comm=MPI.COMM_WORLD)  # 'w' = Create file, truncate if exists
 
-        dataset_disjoint_matrix = hfdm.create_dataset('dmatrix', (size_a, size_b), dtype= np.dtype(np.int8))   # size_a+1 on 2021-08-19
-        # dataset_disjoint_matrix = []   # ready for parallel now is a list/array        
-        # dataset_disjoint_matrix.append(hfdm.create_dataset('dmatrix_{0}'.format(task_id), (size_a, size_b), dtype= np.dtype(np.int8)) )
+        #  dataset_disjoint_matrix = hfdm.create_dataset('dmatrix', (size_a, size_b), dtype= np.dtype(np.int8))   # size_a+1 on 2021-08-19
+        dataset_disjoint_matrix = []   # ready for parallel now is a list/array        
+        dataset_disjoint_matrix.append(hfdm.create_dataset('dmatrix_{0}'.format(task_id), (size_a, size_b), dtype= np.dtype(np.int8)) )
 
         rows_on_disjoint_matrix = 0 # reset counter
-        # parallel version ini
-        # rows_on_disjoint_matrix = 0 # reset counter
-        # number_of_interact = 0 # xitr = 0 # contabiliza o no de iterações    
-        # step = int(number_of_rows/worker_nodes)
-        # sys.stdout.write("Task_{}, Parallel step =  {}\n".format(task_id, step))
-        # start = task_id * step
-        # stop = int( task_id * step + step -1 ) # number_of_rows-1
-        # if task_id + 1 == worker_nodes and stop < number_of_rows:  # ensure odd cases for last parallel task
-        #     stop = number_of_rows-1
-        # sys.stdout.write("Task_{}, start =  {} stop =  {}\n".format(task_id, start, stop))
-        # for i in range(start, stop+1):        
-        # parallel version end
 
         for i in range(number_of_rows-1):
 
@@ -533,39 +523,43 @@ def main():
             rows_on_disjoint_matrix_per_row = 0
             t1_row = time.perf_counter()            
 
-            if comparations_expected_guide > 0:                                                     # if (i not in redundant_array): # redundant observations are not considered.
+            if comparations_expected_guide > 0:  # if (i not in redundant_array): # redundant observations are not considered.
 
-                read_mi_array = dset[0][i,:number_of_features+number_jnsq_features]                 # read attributes and jnsq columns of the observation to be compared
+                read_mi_array = dset[task_id][i,:number_of_features+number_jnsq_features] # read attributes and jnsq columns of the observation to be compared
 
-                for j in range(i+1, number_of_rows):                                                # compares the current observation (row) with the observations in the following rows
+                for j in range(i+1, number_of_rows): # compares the current observation (row) with the observations in the following rows
 
                     number_of_interact_per_row += 1
-                    if (j not in redundant_array) and (class_array[i] != class_array[j]):           # if the observation to be compared is not redundant and has a different class value
+                    if (j not in redundant_array) and (class_array[i] != class_array[j]): # if the observation to be compared is not redundant and has a different class value
 
-                        read_mj_array = dset[0][j,:number_of_features + number_jnsq_features]       # read attributes and jnsq columns from the observation to which it compares
-                        disjoint_array = np.absolute(np.subtract( read_mi_array , read_mj_array ))  # checks whether the elements of the current observation and the observation to it is being compared are equal (=0) or different (=1)
+                        read_mj_array = dset[task_id][j,:number_of_features + number_jnsq_features] # read attributes and jnsq columns from the observation to which it compares
+                        disjoint_array = np.absolute(np.subtract( read_mi_array , read_mj_array )) # checks whether the elements of the current observation and the observation to it is being compared are equal (=0) or different (=1)
 
-                        buffer_array[rows_on_disjoint_matrix_per_row,:] = disjoint_array            # updates buffer
 
-                        rows_on_disjoint_matrix += 1  
+                        # if create_disjoint_matrix_file == 'Y':
+                        #     dataset_disjoint_matrix[rows_on_disjoint_matrix,:] = disjoint_array #  updates DM dataset
+                        buffer_array[rows_on_disjoint_matrix_per_row,:] = disjoint_array #  updates buffer
+
+                        rows_on_disjoint_matrix += 1 
                         rows_on_disjoint_matrix_per_row += 1
 
                     number_of_interact += 1   
 
                 if create_disjoint_matrix_file == 'Y':
-                    dataset_disjoint_matrix[rows_on_disjoint_matrix_guide:comparations_expected_guide,:] = buffer_array                   #  updates DM dataset   
+                    # dataset_disjoint_matrix[rows_on_disjoint_matrix_guide:comparations_expected_guide,:] = buffer_array #  updates DM dataset
+                    dataset_disjoint_matrix[task_id][rows_on_disjoint_matrix_guide:comparations_expected_guide,:] = buffer_array #  updates DM dataset    ERROR
 
             t2_row = time.perf_counter()
             test = (f"in; {t2_row - t1_row:0.4f}; seconds")
             if i % 100 == 0:
-                sys.stdout.write("Task_{};Row;{};Class;{};Number of interact;{};Disjoint rows found;{};{}\n".format(task_id, i, class_array[i], number_of_interact_per_row, rows_on_disjoint_matrix_per_row, test )) 
+                sys.stdout.write("Task_{};Row;{};Class;{};Number of interact;{};Disjoint rows found;{};{}\n".format(task_id, i,  class_array[i], number_of_interact_per_row, rows_on_disjoint_matrix_per_row, test )) 
 
 
         # Finaly
 
         # ERROR??  dset[task_id].attrs['rows_on_disjoint_matrix'] = rows_on_disjoint_matrix  # update metadata of original dataset
 
-        # hf_aux.close()
+        hf_aux.close()
 
         t2 = time.perf_counter()
         print(f"Task_{task_id} - Disjoint matrix generated in; {t2 - t1:0.4f}; seconds")
@@ -574,7 +568,7 @@ def main():
         sys.stdout.write("Task_{}; Total rows_on_disjoint_matrix : {}\n".format(task_id, rows_on_disjoint_matrix ))    
         sys.stdout.write("Task_{}; Estimated fie size {} GB without compression \n".format(task_id, (rows_on_disjoint_matrix * (number_of_features + number_jnsq_features)) / 1024 / 1024 / 1024 ))   
     else:
-        sys.stdout.write("Task_{}; Build Disjoint Matrix = N\n".format(task_id)) 
+        sys.stdout.write("Task_{}; Build Disjoint Matrix =N\n".format(task_id)) 
 
 
     # if create_disjoint_matrix_file == 'N':
@@ -595,32 +589,6 @@ def main():
         sys.stdout.write("Task_{}; perform_find_solution = Y\n".format(task_id)) 
         t1 = time.perf_counter()
 
-        # create_disjoint_matrix_file = config_base[0][15]
-        # if create_disjoint_matrix_file == 'N':         # need to open datasets
-        #     hdf5_disjoint_file = os.path.join(mydir, config_base[0][10])
-        #     # unified_disjoint_matrix_file = config_base[0][17]
-        #     # if unified_disjoint_matrix_file == "Y":
-        #     #     dm_parallel_file_name = hdf5_disjoint_file + '.h5'
-        #     # else:                
-        #     dm_parallel_file_name = hdf5_disjoint_file + str(task_id) + '.h5'
-
-        #     # if worker_nodes > 1:  # serial version running in parallel - handle all rows, and a subset of columns - split dm files 
-
-        #     # unified_disjoint_matrix_file = config_base[0][17]
-        #     # if unified_disjoint_matrix_file == "Y":
-        #     #     dm_parallel_file_name = hdf5_disjoint_file + '.h5'
-        #     # else:                
-        #     #     dm_parallel_file_name = hdf5_disjoint_file + str(task_id) + '.h5'
-        #     #dm_parallel_file_name = hdf5_disjoint_file + str(task_id) + '.h5'
-
-        #     hfdm = h5py.File(dm_parallel_file_name, 'r', driver='mpio', comm=MPI.COMM_WORLD)  
-        #     dataset_disjoint_matrix = hfdm['dmatrix']
-
-        #     rows_on_disjoint_matrix = dset.attrs['rows_on_disjoint_matrix']
-        #     size_b = number_of_features + number_jnsq_features 
-
-
-
 
         dm_col_index_array = np.arange((size_b), dtype=int)                                                         # array of matrix DM columns index - value -1 mens column excluded 
         dm_row_index_array = np.arange((rows_on_disjoint_matrix), dtype=int)                                        # array of matrix DM rows index - value -1 mens row excluded 
@@ -631,7 +599,7 @@ def main():
         # Get matrix Solution ie reduction of the problem
         # -----------------------------------------------------------------        
 
-        continue_interact = True 
+       continue_interact = True 
         while continue_interact == True: 
 
             t1_row = time.perf_counter()
@@ -700,7 +668,7 @@ def main():
     sys.stdout.write("Task_{} Try close all HDF5 Files\n".format(task_id))
     hf.close()
 
-    # hf_aux.close()
+    hf_aux.close()
     if create_disjoint_matrix_file == 'Y':
         hfdm.close()
     sys.stdout.write("Task_{} HDF5 Files Closed\n".format(task_id))    
